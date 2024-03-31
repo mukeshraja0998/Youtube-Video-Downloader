@@ -1,0 +1,59 @@
+<html>
+<head>
+    <Title>YouTube Video Downloader </Title>
+    <meta name="google-site-verification" content="flrc29-VuO2Xv1dht7-FctXKeCKZl4IooErG66w2uAs" />
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+    if ( window.history.replaceState ) {
+        window.history.replaceState( null, null, window.location.href );
+    }
+</script>
+</head>
+<body>    
+    <div class="container mt-3">
+        <h2>YouTube Video Downloader</h2>
+           <br>
+            <ul>
+            <li>Simple</li>
+            <li>No Nasty Ad's</li>
+            <li>Free &#128151;</li> 
+            </ul>
+        <br>
+        <form action="/next_page" method="post">
+            {% if mesage is defined and mesage %}
+                {% if errorType is defined and errorType %}
+                    <div class="alert alert-success">{{ mesage }}</div>
+                {% else  %}
+                    <div class="alert alert-danger">{{ mesage }}</div>
+                {% endif %}
+            {% endif %}
+            <div class="mb-3 mt-3">
+                <label for="video_url">Enter YouTube Video Url:</label>
+                <input type="text" class="form-control" id="video_url" placeholder="Enter url" name="video_url" required="">
+                <br>
+
+    <p>Convert</p>
+    <div class="form-check">
+      <input type="radio" class="form-check-input" id="radio1" name="optradio" value="option1" checked>
+      <label class="form-check-label" for="radio1">Download as Video</label>
+    </div>
+    <div class="form-check">
+      <input type="radio" class="form-check-input" id="radio2" name="optradio" value="option2">
+      <label class="form-check-label" for="radio2">Download as Audio</label>
+    </div>
+
+            </div>          
+            <button type="Proceed" class="btn btn-primary">Download</button>
+        </form>
+      </div>
+    <br><br>
+<footer class="text-center">
+        <div class="wrap copyright">
+            Made with &#128151;
+        </div>
+    </footer>
+</body>
+</html>
