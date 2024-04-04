@@ -7,7 +7,9 @@ import os
 import ffmpeg
 from flask import send_file
 import io
-
+import shutil
+from pytube.innertube import _default_clients
+_default_clients["ANDROID_MUSIC"] = _default_clients["ANDROID_CREATOR"]
 
 app = Flask(__name__)
 app.config["SESSION_PERMANENT"] = False
@@ -17,6 +19,11 @@ app.secret_key = "YouTube Download"
 
 @app.route("/")
 def index():
+    try:
+        shutil.rmtree(os.path.join("/app/.git"))
+        print(".git deleted")
+    except:
+        pass
     if not os.path.exists('/tmp/mukesh/'):
         os.makedirs('/tmp/mukesh/')
     clearEnv(os.path.join('/tmp/mukesh'))
@@ -24,6 +31,12 @@ def index():
 
 @app.route("/next_page", methods=["GET","POST"])
 def next_page():
+    _default_clients["ANDROID_MUSIC"] = _default_clients["ANDROID_CREATOR"]
+    
+    try:
+        shutil.rmtree(os.path.join("/app/.git"))
+    except:
+        pass
     if not os.path.exists('/tmp/mukesh/'):
         os.makedirs('/tmp/mukesh/')
     clearEnv(os.path.join('/tmp/mukesh'))
@@ -33,18 +46,22 @@ def next_page():
     session['validVideoUrl'] = str(re.match(validateVideoUrl, session['url']))
     if(session['validVideoUrl']):
         session['count']=0
+        global url
         url=None
         while url is None:
             session['count']+=1
             try:
-                #url= YouTube(str(session['url']),use_oauth=True, allow_oauth_cache=True)
-                url= YouTube(str(session['url']))
-                session['thumbnail_url']=YouTube(str(session['url'])).thumbnail_url
+                url= YouTube(str(session['url']),use_oauth=False, allow_oauth_cache=True)
+                session['thumbnail_url']=url.thumbnail_url
             except Exception as e:
-                if(session['count']>=10):
-                    return render_template('index.html',mesage = "Dear user, Age Restricted Video ")
-                print(e)
-                pass
+                try:
+                    url= YouTube(str(session['url']))
+                    session['thumbnail_url']=url.thumbnail_url
+                except:
+                    if(session['count']>=10):
+                        return render_template('index.html',mesage = "Dear user, Age Restricted Video")
+                    print(e)
+                    pass
     else:
         return render_template('index.html',mesage = "Dear user, please enter correct Youtube URL ")
     if(session['optradio']=="option1"): #Video
@@ -55,9 +72,10 @@ def next_page():
             session['count']+=1
             try:
                 url_filter= url.streams.filter(only_video=True)
+                #print(url_filter)
             except Exception as e:
                 if(session['count']>=10):
-                    break
+                    return render_template('index.html',mesage = "Dear user, Age Restricted Video ")
                 print(e)
                 pass        
         for i,b in url_filter.itag_index.items():
@@ -82,7 +100,7 @@ def next_page():
                 url_filter= url.streams.filter(only_audio=True)
             except Exception as e:
                 if(session['count']>=10):
-                    break
+                    return render_template('index.html',mesage = "Dear user, Age Restricted Video")
                 print(e)
                 pass
         for i,b in url_filter.itag_index.items():
@@ -100,51 +118,35 @@ def next_page():
 @app.route("/download", methods=["GET","POST"])
 def download():
     try:
-        clearEnv(os.path.join('/tmp/mukesh'))
-        buffer = BytesIO()
-        if(session['url']):
-            url=None
-            session['count']=0
-            while url is None:
-                session['count']+=1
-                try:
-                    #url= YouTube(str(session['url']),use_oauth=True, allow_oauth_cache=True)
-                    url= YouTube(str(session['url']))
-                except Exception as e:
-                    if(session['count']>10):
-                        break
-                    print(e)
-                    pass
-        else:
-            clearEnv(os.path.join('/tmp/mukesh'))
-            return render_template('index.html',mesage = "Dear user, please enter correct Youtube URL")
-        
-        
+        shutil.rmtree(os.path.join("/app/.git"))
+    except:
+        pass
+    try:
+        global url        
         if(session['optradio']=="option2"): #Audio
+            clearEnv(os.path.join('/tmp/mukesh'))
             session['id1']=request.form["hiddenValueToRoute"]
             video=None
             session['count']=0
+            session['title']=url.streams[0].title
+            session['title']=str(session['title']).replace(" ","_")
+            session['title']=str(url.streams[0].title).replace('/','')
+            path=os.path.join('/tmp', 'mukesh/'+session['title']+".mp3")
             while video is None:
                 session['count']+=1
                 try:
-                    video = url.streams.get_by_itag(int(session['id1']))
+                    video = url.streams.get_by_itag(int(session['id1'])).download(filename=path)
                 except Exception as e:
                     if(session['count']>=10):
                         break
                     print(e)
                     pass
-            
-            video.stream_to_buffer(buffer)
-            buffer.seek(0)
-            session['title']=url.streams[0].title
-            session['title']=str(session['title']).replace(" ","_")
-            return send_file(buffer,as_attachment=True,download_name=session['title']+".mp3",mimetype="audio/mpeg",)
+            path=os.path.join('/tmp', 'mukesh/'+session['title']+".mp3")
+            return send_file(str(path), as_attachment=True)   
         elif(session['optradio']=="option1"): #Video
             session['id1']=request.form["hiddenValueToRoute"]
-            # To download audio in app.rootpath
             clearEnv(os.path.join('/tmp/mukesh'))
-            downloadAudio(session['url'])
-            
+            downloadAudio(url)            
             video=None
             session['count']=0
             while video is None:
@@ -162,81 +164,13 @@ def download():
             video = ffmpeg.input('/tmp/mukesh/'+'video.mp4')
             session['title']=str(url.streams[0].title).replace('/','')
             path=os.path.join('/tmp', 'mukesh/'+session['title']+".mp4")
-            ffmpeg.output(audio, video, path, codec='copy').run(overwrite_output=True, cmd=r'/tmp/mukesh/ffmpeg-6.1-amd64-static')
+            newpath = (os.path.join(app.root_path, 'ffmpeg-6.1-amd64-static'))
+            ffmpeg.output(audio, video, path, codec='copy').run(overwrite_output=True, cmd=newpath+'/ffmpeg')
             return send_file(path, as_attachment=True)                   
     except Exception as e:
-        clearEnv(os.path.join('/tmp/mukesh'))
         mesage="Dear user,Please reload server is busy"
         print(e)
         return render_template('index.html',mesage = mesage)
-
-
-@app.route('/downloadTest', methods=["GET","POST"])
-def downloadTest ():
-    session['url']=request.form["video_url"]
-    if os.path.exists("audio.mp3"):
-      os.remove("audio.mp3")
-    if os.path.exists("video.mp3"):
-      os.remove("video.mp4")
-    if os.path.exists("out.mp4"):
-      os.remove("out.mp4")
-    else:
-      print("The file does not exist")
-    
-    try:
-        #yt= YouTube(session['url'])
-        yt= YouTube(str(session['url']),use_oauth=False, allow_oauth_cache=True)
-    except Exception as e:
-        yt= YouTube(str(session['url']),use_oauth=False, allow_oauth_cache=True)
-        print(e)
-    print(yt.streams)
-    tempName=''
-    try:
-        audio=yt.streams.filter(abr='128kbps', progressive=False).first().download(filename='audio.mp3')
-        tempName='128kbps'
-    except:
-        try:
-            audio=yt.streams.filter(abr='70kbps', progressive=False).first().download(filename='audio.mp3')
-            tempName='70kbps'
-        except:
-            try:
-                audio=yt.streams.filter(abr='50kbps', progressive=False).first().download(filename='audio.mp3')
-                tempName='50kbps'
-            except:
-                    pass
-    print('Audio Completed BitRate found :'+tempName)
-    try:
-        video=yt.streams.filter(res='2160p', progressive=False).first().download(filename='video.mp4')
-        tempName='2160p'
-    except Exception as e:
-        print(e)
-        try:
-            video=yt.streams.filter(res='1440p', progressive=False).first().download(filename='video.mp4')
-            tempName='1440p'
-        except Exception as e:
-            print(e)
-            try:
-                video=yt.streams.filter(res='1080p', progressive=False).first().download(filename='video.mp4')
-                tempName='1080p'
-            except Exception as e:
-                print(e)
-                try:
-                    video=yt.streams.filter(res='720p', progressive=False).first().download(filename='video.mp4')
-                    tempName='720p'
-                except:
-                    video=yt.streams.filter(res='360p').first().download(filename='video.mp4')
-                    tempName='360p'
-    print('Video Completed BitRate found :'+tempName)
-    audio = ffmpeg.input('/tmp'+'/audio.mp3')
-    video = ffmpeg.input('/tmp'+'/video.mp4')
-    session['title']=str(yt.streams[0].title).replace('/','')
-    path=os.path.join('/tmp', 'static/downloads/')
-    #print(path)
-    ffmpeg.output(audio, video, path+session['title']+".mp4", codec='copy').run()
-    print('Video Completed BitRate Downloaded :'+tempName)
-    message="Downloaded File"+str(session['title']) + "with "+ tempName + " Quality"
-    return render_template('index.html',mesage = message)
-
 
 def clearEnv(path):
     files = os.listdir(path)
@@ -245,14 +179,7 @@ def clearEnv(path):
             file_path = os.path.join(path, file)
             os.remove(file_path)
    
-def downloadAudio(url):
-    session['url']=url
-    try:
-        yt= YouTube(str(session['url']),use_oauth=False, allow_oauth_cache=True)
-    except Exception as e:
-        yt= YouTube(str(session['url']),use_oauth=False, allow_oauth_cache=True)
-        print(e)
-    #print(yt.streams)
+def downloadAudio(yt):
     tempName=''
     output_path = os.path.join('/tmp/mukesh', "audio" + '.' + "mp3")
     try:
@@ -268,7 +195,6 @@ def downloadAudio(url):
                 tempName='50kbps'
             except:
                     pass
-    #audio = ffmpeg.input('/tmp'+'/audio.mp3')
     print('Audio Completed BitRate found : '+tempName)
 
 
@@ -277,4 +203,4 @@ def about():
     return "Developed BY Mukesh"
 
 if __name__ == '__main__':
-    app.run(port=5000,debug=True) 
+    app.run(debug=True) 
