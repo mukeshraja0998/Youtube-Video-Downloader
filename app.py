@@ -1,5 +1,5 @@
 from pytube import YouTube 
-from flask import Flask, send_file,render_template,request,session
+from flask import Flask, send_file,render_template,request,session,redirect, url_for,flash
 from io import BytesIO
 from flask_session import Session
 import re
@@ -9,13 +9,28 @@ from flask import send_file
 import io
 import shutil
 from pytube.innertube import _default_clients
-_default_clients["ANDROID_MUSIC"] = _default_clients["ANDROID_CREATOR"]
 
 app = Flask(__name__)
 app.config["SESSION_PERMANENT"] = False
 app.config["SESSION_TYPE"] = "filesystem"
 Session(app)
 app.secret_key = "YouTube Download"
+
+clients = {
+    'ANDROID_MUSIC': {
+        'context': {
+            'client': {
+                'clientName': 'ANDROID_MUSIC',
+                'clientVersion': '5.16.51',
+                'androidSdkVersion': 30
+            }
+        },
+        'header': {
+            'User-Agent': 'com.google.android.apps.youtube.music/'
+        },
+        'api_key': 'AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8'
+    }
+}
 
 @app.route("/")
 def index():
@@ -27,12 +42,27 @@ def index():
     if not os.path.exists('/tmp/mukesh/'):
         os.makedirs('/tmp/mukesh/')
     clearEnv(os.path.join('/tmp/mukesh'))
+    session['url']=""
+    session['optradio']=""
     return render_template('index.html')
+
+def changeClient():
+    print("Age Restrication video so changing the client settings")
+    _default_clients["ANDROID_MUSIC"] = _default_clients["ANDROID_CREATOR"]
+    url= YouTube(str(session['url']),use_oauth=False, allow_oauth_cache=True)
+    return url
+
+
+def changeClientDeafult():
+    #print("No Age Restrication video so changing default client settings")
+    _default_clients["ANDROID_MUSIC"] = clients["ANDROID_MUSIC"]
+    #print(clients["ANDROID_MUSIC"])
+    url= YouTube(str(session['url']),use_oauth=False, allow_oauth_cache=True)
+    return url
+
 
 @app.route("/next_page", methods=["GET","POST"])
 def next_page():
-    _default_clients["ANDROID_MUSIC"] = _default_clients["ANDROID_CREATOR"]
-    
     try:
         shutil.rmtree(os.path.join("/app/.git"))
     except:
@@ -41,29 +71,33 @@ def next_page():
         os.makedirs('/tmp/mukesh/')
     clearEnv(os.path.join('/tmp/mukesh'))
     validateVideoUrl = (r'(https?://)?(www\.)?''(youtube|youtu|youtube-nocookie)\.(com|be)/''(watch\?v=|embed/|v/|.+\?v=)?([^&=%\?]{11})')
-    session['url']=request.form["video_url"]
-    session['optradio']=request.form["optradio"]
-    session['validVideoUrl'] = str(re.match(validateVideoUrl, session['url']))
-    if(session['validVideoUrl']):
-        session['count']=0
+    if(session['url']!="" or session['optradio']!=""):
+        pass
+    else:
+        session['url']=request.form["video_url"]
+        session['optradio']=request.form["optradio"]
+    if(re.match(validateVideoUrl, session['url'])):
         global url
         url=None
+        session['count']=0
         while url is None:
-            session['count']+=1
             try:
-                url= YouTube(str(session['url']),use_oauth=False, allow_oauth_cache=True)
+                url= changeClientDeafult()
                 session['thumbnail_url']=url.thumbnail_url
             except Exception as e:
-                try:
-                    url= YouTube(str(session['url']))
-                    session['thumbnail_url']=url.thumbnail_url
-                except:
-                    if(session['count']>=10):
-                        return render_template('index.html',mesage = "Dear user, Age Restricted Video")
-                    print(e)
-                    pass
+                if(session['count']==1):
+                    try:
+                        url = changeClient()
+                        session['thumbnail_url']=url.thumbnail_url
+                    except:
+                        return render_template('index.html',mesage = "Dear user, please reload ")
+                if(session['count']>=10):
+                    return render_template('index.html',mesage = "Dear user, Age Restricted Video ")
+                print(e)
+                pass
     else:
-        return render_template('index.html',mesage = "Dear user, please enter correct Youtube URL ")
+        flash("Dear user, please enter correct Youtube URL", 'danger')
+        return redirect(url_for('index'))
     if(session['optradio']=="option1"): #Video
         li=[]
         url_filter=None
@@ -74,13 +108,20 @@ def next_page():
                 url_filter= url.streams.filter(only_video=True)
                 #print(url_filter)
             except Exception as e:
+                if(session['count']==1):
+                    url = changeClient()
+                    url_filter= url.streams.filter(only_video=True)
+                    session['thumbnail_url']=url.thumbnail_url
+                    if(url_filter is not None):
+                        print("found video exit from loop")
+                        break
                 if(session['count']>=10):
                     return render_template('index.html',mesage = "Dear user, Age Restricted Video ")
                 print(e)
                 pass        
         for i,b in url_filter.itag_index.items():
             temp=[]
-            if(int(b.filesize_mb<5000)):
+            if(int(b.filesize_mb<800)):
                 temp.append(b.resolution)
                 temp.append(b.filesize_mb)
                 temp.append(b.fps)
@@ -101,11 +142,17 @@ def next_page():
             except Exception as e:
                 if(session['count']>=10):
                     return render_template('index.html',mesage = "Dear user, Age Restricted Video")
+                if(session['count']==1):
+                    url = changeClient()
+                    url_filter= url.streams.filter(only_audio=True)
+                    if(url_filter is not None):
+                        print("found audio exit from loop")
+                        break
                 print(e)
                 pass
         for i,b in url_filter.itag_index.items():
             temp=[]
-            if(int(b.filesize_mb<150)):
+            if(int(b.filesize_mb<300)):
                 temp.append(b.abr)
                 temp.append(b.filesize_mb)
                 temp.append(i)
@@ -138,7 +185,8 @@ def download():
                     video = url.streams.get_by_itag(int(session['id1'])).download(filename=path)
                 except Exception as e:
                     if(session['count']>=10):
-                        break
+                        mesage="Dear user,Error While Downloading the audio"
+                        return render_template('index.html',mesage = mesage)
                     print(e)
                     pass
             path=os.path.join('/tmp', 'mukesh/'+session['title']+".mp3")
@@ -156,7 +204,8 @@ def download():
                     video = url.streams.get_by_itag(int(session['id1'])).download(filename=output_path)
                 except Exception as e:
                     if(session['count']>=10):
-                        break
+                        mesage="Dear user,Error While Downloading the Video"
+                        return render_template('index.html',mesage = mesage)
                     print(e)
                     pass
             # Merge audio and video
@@ -168,7 +217,7 @@ def download():
             ffmpeg.output(audio, video, path, codec='copy').run(overwrite_output=True, cmd=newpath+'/ffmpeg')
             return send_file(path, as_attachment=True)                   
     except Exception as e:
-        mesage="Dear user,Please reload server is busy"
+        mesage="Dear user,Internal Error Happened while merging please try again"
         print(e)
         return render_template('index.html',mesage = mesage)
 
@@ -194,7 +243,8 @@ def downloadAudio(yt):
                 audio=yt.streams.filter(abr='50kbps', progressive=False).first().download(filename=output_path)
                 tempName='50kbps'
             except:
-                    pass
+                    mesage="Dear user,Internal Error Happened while merging please try again"
+                    return render_template('index.html',mesage = mesage)
     print('Audio Completed BitRate found : '+tempName)
 
 
@@ -203,4 +253,4 @@ def about():
     return "Developed BY Mukesh"
 
 if __name__ == '__main__':
-    app.run(debug=True) 
+    app.run(debug=True)
