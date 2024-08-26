@@ -1,4 +1,4 @@
-from pytube import YouTube 
+from pytubefix import YouTube 
 from flask import Flask, send_file,render_template,request,session,redirect, url_for,flash
 from io import BytesIO
 from flask_session import Session
@@ -8,7 +8,7 @@ import ffmpeg
 from flask import send_file
 import io
 import shutil
-from pytube.innertube import _default_clients
+from pytubefix.innertube import _default_clients
 
 app = Flask(__name__)
 app.config["SESSION_PERMANENT"] = False
@@ -121,7 +121,7 @@ def next_page():
                 pass        
         for i,b in url_filter.itag_index.items():
             temp=[]
-            if(int(b.filesize_mb<800)):
+            if(int(b.filesize_mb<2000)):
                 temp.append(b.resolution)
                 temp.append(b.filesize_mb)
                 temp.append(b.fps)
