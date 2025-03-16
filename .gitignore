@@ -10,3 +10,4 @@ flask_session
 *.mp4
 *./__pycache__/*
 ffmpeg-6.1-amd64-static
+ffmpeg/__pycache__/*

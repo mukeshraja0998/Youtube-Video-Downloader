@@ -9,6 +9,8 @@ from flask import send_file
 import io
 import shutil
 from pytubefix.innertube import _default_clients
+from pytubefix.cli import on_progress
+
 
 app = Flask(__name__)
 app.config["SESSION_PERMANENT"] = False
@@ -162,6 +164,13 @@ def next_page():
         return render_template('index2.html',audioList=li,name=session['name'],image=session['thumbnail_url'])
 
 
+@app.route("/checkBot", methods=["GET","POST"])
+def checkBot():
+    url='https://www.youtube.com/watch?v=puLspjWq_Bg&list=RDpuLspjWq_Bg&start_radio=1'
+    yt = YouTube(url, on_progress_callback = on_progress)
+    print(yt.title)
+    return yt.title
+  
 @app.route("/download", methods=["GET","POST"])
 def download():
     try:
